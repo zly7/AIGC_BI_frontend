@@ -1,13 +1,20 @@
 import {
   UploadOutlined,
 } from '@ant-design/icons';
-
+import ReactECharts from 'echarts-for-react';
 import { message, Form, Upload, Button, Select} from 'antd';
-import React from 'react';
+import React, {useState} from 'react';
 import {genChartByAiUsingPost} from "@/services/yubi/chartController";
 import TextArea from "antd/es/input/TextArea";
 const AddChart: React.FC = () => {
+  const [option,setOption] = useState<any>();
+  const [chartResponseAllInformation,setChartResponseAllInformation] = useState<API.BiResponse>();
+  const [submitting,setSubmitting] = useState<boolean>(false);
   const onFinish = async (values: any) => {
+    if(submitting){
+      return;
+    }
+    setSubmitting(true);
     console.log('用户上传的是: ', values);
     const params = {
       ...values,
@@ -15,8 +22,18 @@ const AddChart: React.FC = () => {
     }
     try{
       const res = await genChartByAiUsingPost(params,{},values.file_obj.file.originFileObj);
-      console.log(res);
-      message.success('分析成功');
+      if(!res?.data){
+        message.error('分析失败');
+      }else{
+        const chartParsed = JSON.parse(res.data.genChart ?? ''); //这里主要为了防止AI生成的没办法被JSON解析
+        if(chartParsed){
+          setChartResponseAllInformation(res.data);
+          setOption(chartParsed);
+        }else{
+          throw new Error('AI生成的不符合JSON解析规范，解析失败')
+        }
+        message.success('分析成功');
+      }
     }catch (e:any){
       message.error('分析失败'+e.message);
     }
@@ -55,8 +72,13 @@ const AddChart: React.FC = () => {
             Submit
           </Button>
         </Form.Item>
-
       </Form>
+      <div>
+        {chartResponseAllInformation?.genResult}
+      </div>
+      <div>
+        {option && <ReactECharts option={option} />}
+      </div>
     </div>
   );
 };
