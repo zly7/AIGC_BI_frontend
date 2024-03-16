@@ -3,14 +3,18 @@
 // API 更新时间：
 // API 唯一标识：
 import * as chartController from './chartController';
+import * as chatController from './chatController';
 import * as fileController from './fileController';
 import * as postFavourController from './postFavourController';
 import * as postThumbController from './postThumbController';
+import * as queueController from './queueController';
 import * as userController from './userController';
 export default {
   chartController,
+  chatController,
   fileController,
   postFavourController,
   postThumbController,
+  queueController,
   userController,
 };

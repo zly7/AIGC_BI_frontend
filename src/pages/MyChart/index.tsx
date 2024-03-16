@@ -3,15 +3,20 @@ import React, {useEffect, useState} from 'react';
 import {listMyChartVoByPageUsingPost} from "@/services/yubi/chartController";
 import { List, message } from 'antd';
 import ReactECharts from "echarts-for-react";
+import {useModel} from "@umijs/max";
+import Search from "antd/es/input/Search";
 
 const MyChartPage: React.FC = () => {
   const initSearchParams = {
+    current:1,
     pageSize:12
   }
 
   const [searchParams,setSearchParams] = useState<API.ChartQueryRequest>({...initSearchParams});
   const [chartLists,setChartLists] = useState<API.Chart[]>();
+  const initialState = useModel("@@initialState")
   const [total,setTotal] = useState<number>();
+  console.log(initialState);
   const loadData = async () => {
     try {
       const res = await listMyChartVoByPageUsingPost(searchParams);
@@ -27,21 +32,41 @@ const MyChartPage: React.FC = () => {
 
   return (
     <div className={'my-chart-page'}>
+      <div>
+        <Search
+          placeholder="请输入搜索图表名称"
+          enterButton="Search"
+          size="large"
+          onSearch={(value) => {
+            setSearchParams({...initSearchParams,
+              name:value
+            })
+          }}
+        />
+      </div>
       <List
-        itemLayout="vertical"
-        size="large"
+        grid={{
+          gutter: 16,
+          xs: 1,
+          sm: 1,
+          md: 1,
+          lg: 1,
+          xl: 2,
+          xxl: 2,
+        }}
         pagination={{
-          onChange: (page) => {
-            console.log(page);
+          onChange: (page,pageSize) => {
+          setSearchParams({
+              ...searchParams,
+              current:page,
+              pageSize:pageSize
+            })
           },
-          pageSize: 3,
+          current: searchParams.current,
+          pageSize: searchParams.pageSize,
+          total:total
         }}
         dataSource={chartLists}
-        footer={
-          <div>
-            <b>ant design</b> footer part
-          </div>
-        }
         renderItem={(item) => (
           <List.Item
             key={item.name}
@@ -51,17 +76,23 @@ const MyChartPage: React.FC = () => {
               description={ item.chartType?? "未提供图标类型"}
             />
             {item.genResult}
-            {/*{(() => {*/}
-            {/*  try {*/}
-            {/*    const chartOptionString = JSON.stringify(item.genChart);*/}
-            {/*    return <ReactECharts option={chartOptionString}/>;*/}
-            {/*  } catch (error) {*/}
-            {/*    console.error("Failed to stringify item.genChart:", error);*/}
-            {/*    // 根据需要返回一个备选的 React 元素，或者什么都不返回（null）*/}
-            {/*    return null; // 或者可以是错误提示组件*/}
-            {/*  }*/}
-            {/*})()}*/}
-            <ReactECharts option={item.genChart}/>;
+            {
+              item.status === 'running' && <>
+                <div>分析中</div>
+              </>
+            }
+            {
+              item.status === "succeed" && <>
+                 <ReactECharts option={JSON.parse(item.genChart ?? '')}/>;
+              </>
+            }
+            {
+              item.status === "failed" && <>
+                <div>分析失败</div>
+              </>
+            }
+
+
           </List.Item>
         )}
       />

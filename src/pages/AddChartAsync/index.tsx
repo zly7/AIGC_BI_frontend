@@ -3,13 +3,35 @@ import {
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { message, Form, Upload, Button, Select, Row, Col, Card, Spin, Divider, Radio } from 'antd';
-import React, {useState} from 'react';
-import {genChartByAiUsingPost} from "@/services/yubi/chartController";
+import React, {useEffect, useState} from 'react';
+import {genChartByAiAsyncUsingPost, getChartVoByIdUsingGet} from "@/services/yubi/chartController";
 import TextArea from "antd/es/input/TextArea";
+import EChartsReact from "echarts-for-react";
 const AddChart: React.FC = () => {
   const [option,setOption] = useState<any>();
-  const [chartResponseAllInformation,setChartResponseAllInformation] = useState<API.BiResponse>();
+  const [chartResponseAllInformation,setChartResponseAllInformation] = useState<API.Chart>();
   const [submitting,setSubmitting] = useState<boolean>(false);
+  const[currentChartId,setCurrentChartId] = useState<number>();
+  const [shouldStopPolling, setShouldStopPolling] = useState<boolean>(false); // 新增状态变量
+  const fetchChartInformation = async (chartId: number) => {
+    // 异步函数，用于向后端请求数据
+    try {
+      const res = await getChartVoByIdUsingGet({ id:chartId });
+      if (res && res.data) {
+        setChartResponseAllInformation(res?.data);
+        const chartParsed = JSON.parse(res?.data.genChart ?? '');
+        if(chartParsed){
+          setOption(chartParsed);
+          setShouldStopPolling(true);
+        }
+      } else {
+        message.error('获取图表信息失败');
+      }
+    } catch (error) {
+      console.error('获取图表信息异常', error);
+      message.error('获取图表信息异常');
+    }
+  };
   const onFinish = async (values: any) => {
     if(submitting){
       return;
@@ -21,24 +43,33 @@ const AddChart: React.FC = () => {
       file_obj:undefined
     }
     try{
-      const res = await genChartByAiUsingPost(params,{},values.file_obj.file.originFileObj);
+      const res = await genChartByAiAsyncUsingPost(params,{},values.file_obj.file.originFileObj);
       if(!res?.data){
         message.error('分析失败');
       }else{
-        const chartParsed = JSON.parse(res.data.genChart ?? ''); //这里主要为了防止AI生成的没办法被JSON解析
+        const chartParsed = res?.data.chartId;
         if(chartParsed){
-          setChartResponseAllInformation(res.data);
-          setOption(chartParsed);
-        }else{
-          throw new Error('AI生成的不符合JSON解析规范，解析失败')
+          setCurrentChartId(chartParsed);
+          setShouldStopPolling(false); // 重新设置定时器
         }
-        message.success('分析成功');
       }
     }catch (e:any){
-      message.error('分析失败'+e.message);
+      message.error('分析请求提交失败'+e.message);
     }
     setSubmitting(false);
   };
+  useEffect(() => {
+    if (shouldStopPolling) {
+      return;
+    }
+    const intervalId = setInterval(() => {
+      if (currentChartId) {
+        fetchChartInformation(currentChartId);
+      }
+    }, 3000); // 设置定时器，每秒查询一次
+    return () => clearInterval(intervalId); // 组件卸载时清理定时器
+  }, [currentChartId,shouldStopPolling]); // 依赖项为currentChartId，当其变化时重新设置定时器
+
   return (
     <div className={'add-chart'}>
       <Row gutter={24}>
@@ -93,21 +124,39 @@ const AddChart: React.FC = () => {
           </Card>
         </Col>
         <Col span={12}>
-          <Card title={'分析结论'}>
+          <Card title={'异步分析结果'}>
             <Spin spinning={submitting}></Spin>
             <div>
-              {chartResponseAllInformation?.genResult ? (
-                chartResponseAllInformation?.genResult
-              ) : (
-                <div>请先在左侧进行提交</div>
-              )}
+              {chartResponseAllInformation?.status === 'running' &&
+                <div>
+                  <Divider>分析中</Divider>
+                  <p>分析中，请耐心等待</p>
+                </div>
+              }
+              {chartResponseAllInformation?.status === 'wait' &&
+                <div>
+                  <Divider>等待中</Divider>
+                  <p>等待中，请耐心等待</p>
+                </div>
+              }
+              {
+                chartResponseAllInformation?.status === 'succeed' &&
+                <div>
+                  <Divider>分析成功</Divider>
+                  <p>{chartResponseAllInformation?.genResult}</p>
+                  <EChartsReact option={option} />
+                </div>
+              }
+              {
+                chartResponseAllInformation?.status === 'failed' &&
+                <div>
+                  <Divider>分析失败</Divider>
+                  <p>{chartResponseAllInformation?.execMessage}</p>
+                </div>
+              }
             </div>
           </Card>
-          <Divider></Divider>
-          <Card title={'生成图表'}>
-            <Spin spinning={submitting}></Spin>
-            <div>{option ? <ReactECharts option={option} /> : <div>请先在左侧进行提交</div>}</div>
-          </Card>
+
         </Col>
       </Row>
     </div>
