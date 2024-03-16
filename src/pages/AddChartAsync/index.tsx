@@ -1,7 +1,6 @@
 import {
   UploadOutlined,
 } from '@ant-design/icons';
-import ReactECharts from 'echarts-for-react';
 import { message, Form, Upload, Button, Select, Row, Col, Card, Spin, Divider, Radio } from 'antd';
 import React, {useEffect, useState} from 'react';
 import {genChartByAiAsyncUsingPost, getChartVoByIdUsingGet} from "@/services/yubi/chartController";
@@ -19,13 +18,13 @@ const AddChart: React.FC = () => {
       const res = await getChartVoByIdUsingGet({ id:chartId });
       if (res && res.data) {
         setChartResponseAllInformation(res?.data);
-        const chartParsed = JSON.parse(res?.data.genChart ?? '');
-        if(chartParsed){
-          setOption(chartParsed);
-          setShouldStopPolling(true);
+        if(res?.data.genChart){
+          const chartParsed = JSON.parse(res?.data.genChart ?? '');
+          if(chartParsed){
+            setOption(chartParsed);
+            setShouldStopPolling(true);
+          }
         }
-      } else {
-        message.error('获取图表信息失败');
       }
     } catch (error) {
       console.error('获取图表信息异常', error);
@@ -106,8 +105,8 @@ const AddChart: React.FC = () => {
               <Form.Item label="模型选择" name="modelName">
                 <Radio.Group>
                   <Radio.Button value={"yucongming"}>鱼聪明</Radio.Button>
-                  <Radio.Button value={"GPT-3.5"}>GPT-3.5</Radio.Button>
-                  <Radio.Button value="GPT-4">GPT-4</Radio.Button>
+                  <Radio.Button value={"gpt-3.5-turbo"}>GPT-3.5-turbo</Radio.Button>
+                  <Radio.Button value="gpt-4">GPT-4</Radio.Button>
                 </Radio.Group>
               </Form.Item>
               <Form.Item name="file_obj" label="原始文件上传">
